@@ -15,6 +15,7 @@
 // Constants --------------------------------------------------
 
 const int maxlen = 1024;
+const int request_digit_limit = 3;
 const int port = 12345;
 
 // Types ------------------------------------------------------
@@ -52,6 +53,9 @@ void send_message(void);            // State: 8
 void show_new_messages(void);       // State: 9
 void show_channel_members(void);    // State: 10
 void leave_channel(void);           // State: 11
+
+void get_input(char *);
+int get_int(void);
 
 // Main -------------------------------------------------------
 
@@ -114,8 +118,6 @@ int main(int argc, const char * argv[]) {
         printf("\n");
     }
     
-    socket_shutdown();
-    
     return 0;
 }
 
@@ -128,8 +130,7 @@ void account_menu() // State: 0
     printf("2: Login\n");
     printf("3: Exit\n");
     
-    int request = 0;
-    scanf("%d", &request);
+    int request = get_int();
         
     switch (request) {
         case 1:
@@ -155,10 +156,10 @@ void user_register() // State: 1
     string username, password;
     
     printf("Please enter your username:\n");
-    scanf("%s", username);
+    get_input(username);
     
     printf("Please enter your password:\n");
-    scanf("%s", password);
+    get_input(password);
     
     string message;
     memset(message, 0, sizeof(string));
@@ -170,40 +171,20 @@ void user_register() // State: 1
         state = account_menu_state;
         return;
     }
-    send(sock, message, strlen(message), 0);
-    
-    memset(message, 0, sizeof(string));
-    recv(sock, message, sizeof(string), 0);
+    int success = request_server(message);
     socket_shutdown();
     
-    cJSON * result = cJSON_Parse(message), * data;
-    
-    data = cJSON_GetObjectItemCaseSensitive(result, "type");
-    
-    if(cJSON_IsString(data))
+    if(success == 1)
     {
-        if(strcmp(data->valuestring, "Successful") == 0) // Success
-        {
-            printf("User successfully registered!\n");
-            cJSON_Delete(result);
-            state = account_menu_state;
-            return;
-        }
-        // If the function execution goes beyond this point, an error has occurred.
-        // Checking if the error is because of duplicate data...
-        data = cJSON_GetObjectItemCaseSensitive(result, "content");
-        if(cJSON_IsString(data) && strcmp(data->valuestring, "this username is not available.") == 0)
-        {
-            printf("This username is already taken.\n");
-            state = account_menu_state;
-            cJSON_Delete(result);
-            return;
-        }
+        printf("User successfully registered!\n");
     }
-    
-    // If the function execution gets here, an unidentified error has occured.
-    printf("Oops! registration failed :(\n");
-    cJSON_Delete(result);
+    else if(success == -1)
+    {
+        printf("Oops! An unknown error caused the registration to fail :(\n");
+        // Other error options are "This username is already taken.\n"
+        // or "The username or password you have entered is invalid.\n"
+    }
+
     state = account_menu_state;
 }
 
@@ -212,10 +193,10 @@ void user_login() // State: 2
     string username, password;
     
     printf("Please enter your username:\n");
-    scanf("%s", username);
+    get_input(username);
     
     printf("Please enter your password:\n");
-    scanf("%s", password);
+    get_input(password);
     
     string message;
     sprintf(message, "login %s, %s\n", username, password);
@@ -287,8 +268,7 @@ void main_menu() // State: 3
     printf("2: Join channel\n");
     printf("3: Logout\n");
     
-    int request = 0;
-    scanf("%d", &request);
+    int request = get_int();
         
     switch (request) {
         case 1:
@@ -313,7 +293,7 @@ void create_channel() // State: 4
 {
     string chname;
     printf("Please enter your channel name:\n");
-    scanf("%s", chname);
+    get_input(chname);
     
     string message;
     sprintf(message, "create channel %s, %s\n", chname, token);
@@ -332,9 +312,11 @@ void create_channel() // State: 4
         printf("Channel \"%s\" was successfully created!\n", chname);
         state = chat_menu_state;
     }
-    else
+    else if(success == -1)
     {
-        printf("Channel name is not available.\n");
+        printf("Oops! An unknown error prevented the user from creating the channel :(\n");
+        state = main_menu_state;
+    } else {
         state = main_menu_state;
     }
 }
@@ -343,7 +325,7 @@ void join_channel() // State: 5
 {
     string chname;
     printf("Please enter the channel name:\n");
-    scanf("%s", chname);
+    get_input(chname);
     
     string message;
     sprintf(message, "join channel %s, %s\n", chname, token);
@@ -362,9 +344,11 @@ void join_channel() // State: 5
         printf("You are now in the channel \"%s\"!\n", chname);
         state = chat_menu_state;
     }
-    else
+    else if(success == -1)
     {
-        printf("Channel not found.\n");
+        printf("Oops! An unknown error prevented the user from joining the channel :(\n");
+        state = main_menu_state;
+    } else {
         state = main_menu_state;
     }
 }
@@ -388,9 +372,11 @@ void user_logout() // State: 6
         printf("Successfully logged out.\n");
         state = account_menu_state;
     }
-    else
+    else if(success == -1)
     {
         printf("Oops! Logout failed :(\n");
+        state = main_menu_state;
+    } else {
         state = main_menu_state;
     }
 }
@@ -403,8 +389,7 @@ void chat_menu() // State: 7
     printf("3: Show channel members\n");
     printf("4: Leave channel\n");
     
-    int request = 0;
-    scanf("%d", &request);
+    int request = get_int();
         
     switch (request) {
         case 1:
@@ -433,21 +418,8 @@ void send_message() // State: 8
 {
     printf("Message:\n");
     
-    int i = 0;
     string msg;
-    char current;
-    
-    scanf("%c", &current);
-    while (current == '\n') {
-        scanf("%c", &current);
-    }
-    
-    for(i = 0; current != '\n' && i < maxlen; i++)
-    {
-        msg[i] = current;
-        scanf("%c", &current);
-    }
-    msg[i] = '\0';
+    get_input(msg);
     
     string message;
     sprintf(message, "send %s, %s\n", msg, token);
@@ -463,7 +435,7 @@ void send_message() // State: 8
     
     if(success == 1)
         printf("Message sent successfully.\n");
-    else
+    else if(success == -1)
         printf("Oops! Message failed to send :(\n");
     state = chat_menu_state;
 }
@@ -584,9 +556,11 @@ void leave_channel() // State: 11
         printf("Successfully leaved the channel.\n");
         state = main_menu_state;
     }
-    else
+    else if(success == -1)
     {
         printf("Oops! Failed to leave the channel :(\n");
+        state = chat_menu_state;
+    } else {
         state = chat_menu_state;
     }
 }
@@ -639,8 +613,21 @@ int request_server(string message)
     data = cJSON_GetObjectItemCaseSensitive(result, "type");
 
     int success = 0;
-    if(cJSON_IsString(data) && strcmp(data->valuestring, "Successful") == 0)
-        success = 1;
+    if(cJSON_IsString(data))
+    {
+        if(strcmp(data->valuestring, "Successful") == 0)
+            success = 1;
+        else
+        {
+            data = cJSON_GetObjectItemCaseSensitive(result, "content");
+            if(cJSON_IsString(data))
+                printf("%s\n", data->valuestring);
+            else
+                success = -1;
+        }
+    } else {
+        success = -1;
+    }
 
     cJSON_Delete(result);
     return success;
@@ -649,4 +636,49 @@ int request_server(string message)
 void socket_shutdown()
 {
     shutdown(sock, SHUT_RDWR);
+}
+
+void get_input(char * buffer)
+{
+    int i = 0;
+    char current;
+    
+    scanf("%c", &current);
+    while (current == '\n')
+    {
+        scanf("%c", &current);
+    }
+    for(i = 0; current != '\n' && i < maxlen; i++)
+    {
+        buffer[i] = current;
+        scanf("%c", &current);
+    }
+    buffer[i] = '\0';
+}
+
+int get_int()
+{
+    int result = 0, i = 0, has_ch_or_is_longer_than_expected = 0;
+    char current;
+    
+    scanf("%c", &current);
+    while (current == '\n')
+    {
+        scanf("%c", &current);
+    }
+    while(current != '\n')
+    {
+        if(current >= '0' && current <= '9' && i < request_digit_limit)
+        {
+            result *= 10;
+            result += (current - '0');
+            i++;
+        } else {
+            has_ch_or_is_longer_than_expected = 1;
+        }
+        scanf("%c", &current);
+    }
+    if(has_ch_or_is_longer_than_expected)
+        result = 0;
+    return result;
 }
