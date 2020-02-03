@@ -13,6 +13,13 @@
 #include <arpa/inet.h>
 #include "client.h"
 
+// Types ------------------------------------------------------
+
+typedef char string[1024];
+
+enum boolean{False, True};
+enum states{account_menu_state, user_register_state, user_login_state, main_menu_state, create_channel_state, join_channel_state, user_logout_state, chat_menu_state, send_message_state, show_new_messages_state, show_channel_members_state, leave_channel_state};
+
 // Constants --------------------------------------------------
 
 const int maxlen = 1024;
@@ -508,15 +515,13 @@ void show_channel_members() // State: 10
 
 void leave_channel() // State: 11
 {
-    printf("Channel members:\n");
-    
     string message;
     sprintf(message, "leave %s\n", token);
     
     int connected = connect_to_server();
     if(connected < 0)
     {
-        state = main_menu_state;
+        state = chat_menu_state;
         return;
     }
     int success = request_server(message);

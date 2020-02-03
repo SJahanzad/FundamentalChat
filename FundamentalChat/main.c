@@ -13,12 +13,27 @@
 // Main -------------------------------------------------------
 
 int main(int argc, const char * argv[]) {
-    char c;
-    printf("Choose Mode:\n(c for client and s for server)\n");
-    scanf("%c", &c);
-    if(c == 'c')
-        client_main();
-    if(c == 's')
-        server_main();
+    char state = '0';
+    printf("Choose Mode:\n(c for client, s for server and e for exit)\n");
+    
+    while(state != 'e')
+    {
+        switch (state) {
+            case 'c':
+                client_main();
+                state = 'e';
+                break;
+
+            case 's':
+                server_main();
+                state = 'e';
+                break;
+
+            default:
+                break;
+        }
+        if(state != 'e')
+            scanf("%c", &state);
+    }
     return 0;
 }

@@ -13,9 +13,6 @@
 
 typedef char string[1024];
 
-enum boolean{False, True};
-enum states{account_menu_state, user_register_state, user_login_state, main_menu_state, create_channel_state, join_channel_state, user_logout_state, chat_menu_state, send_message_state, show_new_messages_state, show_channel_members_state, leave_channel_state};
-
 // Method prototypes ------------------------------------------
 
 int client_main(void);
