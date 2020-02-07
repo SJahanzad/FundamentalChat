@@ -9,7 +9,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "cJSON.h"
+#include "SJSON.h"
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <time.h>
@@ -40,7 +40,7 @@ int option = 1;
 
 int serv_state = idle_state;
 
-cJSON * users, * channels, * user_channels, * channel_messages, * last_read, * online;
+sjson * users, * channels, * user_channels, * channel_messages, * last_read, * online;
 
 // Main -------------------------------------------------------
 
@@ -51,14 +51,17 @@ int server_main()
     int serv_sockaddr_len = sizeof(serv_socket_address);
     string client_message, username, password;
     
-    users = cJSON_CreateObject();
-    channels = cJSON_CreateObject();
-    user_channels = cJSON_CreateObject();
-    channel_messages = cJSON_CreateObject();
-    last_read = cJSON_CreateObject();
-    online = cJSON_CreateObject();
+    users = sjson_CreateObject();
+    channels = sjson_CreateObject();
+    user_channels = sjson_CreateObject();
+    channel_messages = sjson_CreateObject();
+    last_read = sjson_CreateObject();
+    online = sjson_CreateObject();
     
     while(serv_state != -1) {
+        
+//        printf("fordebug: last_read is %s", sjson_Print(last_read));
+        
         memset(client_message, 0, sizeof(string));
         memset(username, 0, sizeof(string));
         memset(password, 0, sizeof(string));
@@ -118,12 +121,12 @@ int server_main()
         }
     }
     
-    cJSON_Delete(users);
-    cJSON_Delete(channels);
-    cJSON_Delete(user_channels);
-    cJSON_Delete(channel_messages);
-    cJSON_Delete(last_read);
-    cJSON_Delete(online);
+    sjson_Delete(users);
+    sjson_Delete(channels);
+    sjson_Delete(user_channels);
+    sjson_Delete(channel_messages);
+    sjson_Delete(last_read);
+    sjson_Delete(online);
     return 0;
 }
 
@@ -184,12 +187,12 @@ int server_init() {
 }
 
 int declare_success(int c_sock) {
-    cJSON * success = cJSON_CreateObject();
-    cJSON_AddStringToObject(success, "type", "Successful");
-    cJSON_AddStringToObject(success, "content", "");
+    sjson * success = sjson_CreateObject();
+    sjson_AddStringToObject(success, "type", "Successful");
+    sjson_AddStringToObject(success, "content", "");
     
-    char * res = cJSON_Print(success);
-    cJSON_Delete(success);
+    char * res = sjson_Print(success);
+    sjson_Delete(success);
     
     send(c_sock, res, strlen(res), 0);
     printf("Sent message: %s\n", res);
@@ -200,12 +203,13 @@ int declare_success(int c_sock) {
 }
 
 int throw_error(string error_message, int c_sock) {
-    cJSON * error = cJSON_CreateObject();
-    cJSON_AddStringToObject(error, "type", "Error");
-    cJSON_AddStringToObject(error, "content", error_message);
+    sjson * error = sjson_CreateObject();
+    sjson_AddStringToObject(error, "type", "Error");
+    sjson_AddStringToObject(error, "content", error_message);
     
-    char * res = cJSON_Print(error);
-    cJSON_Delete(error);
+    char * res = sjson_Print(error);
+    
+    sjson_Delete(error);
     
     send(c_sock, res, strlen(res), 0);
     printf("Sent message: %s\n", res);
@@ -282,9 +286,6 @@ void user_register_task(string client_message)
         return;
     }
     
-    //TODO: directory creation
-//    struct stat st = {0};
-//    if (stat("./ChatResources/Users", &st) == -1) {
     int dircreatedres = mkdir("./ChatResources", S_IRWXU);
     if(dircreatedres != 0 && errno != EEXIST)
     {
@@ -297,8 +298,6 @@ void user_register_task(string client_message)
         throw_error("Directory creation failed.", client_sock);
         return;
     }
-//        printf("HEEEESEREREREEEEE!\n");
-//    }
     
     memset(fname, 0, sizeof(fname));
     sprintf(fname, "./ChatResources/Users/%s.json", username);
@@ -315,11 +314,11 @@ void user_register_task(string client_message)
         return;
     }
     
-    cJSON * user = cJSON_CreateObject();
-    cJSON_AddStringToObject(user, "username", username);
-    cJSON_AddStringToObject(user, "password", password);
+    sjson * user = sjson_CreateObject();
+    sjson_AddStringToObject(user, "username", username);
+    sjson_AddStringToObject(user, "password", password);
     
-    char * res = cJSON_Print(user);
+    char * res = sjson_Print(user);
     
     fprintf(db, "%s\n", res);
     
@@ -328,7 +327,7 @@ void user_register_task(string client_message)
     
     declare_success(client_sock);
     
-    cJSON_Delete(user);
+    sjson_Delete(user);
 }
 
 void user_login_task(string client_message)
@@ -346,6 +345,7 @@ void user_login_task(string client_message)
         j++;
     }
     username[i] = '\0';
+    lower_username[i] = '\0';
     if(username[0] == '\0')
     {
         throw_error("Please enter a valid username.", client_sock);
@@ -386,14 +386,15 @@ void user_login_task(string client_message)
     user[i] = '\0';
     fclose(db);
     
-    if(cJSON_GetObjectItemCaseSensitive(online, lower_username) != NULL)
+    if(sjson_GetObjectItemCaseSensitive(online, lower_username) != NULL)
     {
         throw_error("User is already logged in.", client_sock);
         return;
     }
     
-    cJSON * contents = cJSON_Parse(user), * real_password;
-    real_password = cJSON_GetObjectItemCaseSensitive(contents, "password");
+    
+    sjson * contents = sjson_Parse(user), * real_password;
+    real_password = sjson_GetObjectItemCaseSensitive(contents, "password");
     
     if(strcmp(password, real_password->valuestring) == 0)
     {
@@ -408,30 +409,30 @@ void user_login_task(string client_message)
                 r = rand() % n;
                 token[i] = seed[r];
             }
-            seed[i] = '\0';
-        } while(cJSON_GetObjectItemCaseSensitive(users, token) != NULL);
+            token[i] = '\0';
+        } while(sjson_GetObjectItemCaseSensitive(users, token) != NULL);
+
+        sjson_AddStringToObject(users, token, username);
+        sjson_AddStringToObject(online, lower_username, token);
         
-        cJSON_AddStringToObject(users, token, username);
-        cJSON_AddStringToObject(online, lower_username, token);
+        sjson * token_message = sjson_CreateObject();
         
-        cJSON * token_message = cJSON_CreateObject();
+        sjson_AddStringToObject(token_message, "type", "AuthToken");
+        sjson_AddStringToObject(token_message, "content", token);
         
-        cJSON_AddStringToObject(token_message, "type", "AuthToken");
-        cJSON_AddStringToObject(token_message, "content", token);
-        
-        char * res = cJSON_Print(token_message);
-        
+        char * res = sjson_Print(token_message);
+
         send(client_sock, res, strlen(res), 0);
         printf("Sent message: %s\n", res);
         
         free(res);
         
-        cJSON_Delete(token_message);
+        sjson_Delete(token_message);
     } else {
         throw_error("Incorrect password.", client_sock);
     }
     
-    cJSON_Delete(contents);
+    sjson_Delete(contents);
 }
 
 void create_channel_task(string client_message)
@@ -466,7 +467,7 @@ void create_channel_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
@@ -486,7 +487,7 @@ void create_channel_task(string client_message)
         return;
     }
     
-    if(cJSON_GetObjectItemCaseSensitive(user_channels, token) != NULL)
+    if(sjson_GetObjectItemCaseSensitive(user_channels, token) != NULL)
     {
         throw_error("User is already in a channel.", client_sock);
         return;
@@ -507,28 +508,28 @@ void create_channel_task(string client_message)
         return;
     }
     
-    cJSON * channel = cJSON_CreateObject(), * arr;
-    cJSON_AddArrayToObject(channel, "messages");
-    cJSON_AddStringToObject(channel, "name", channel_name);
+    sjson * channel = sjson_CreateObject(), * arr;
+    sjson_AddArrayToObject(channel, "messages");
+    sjson_AddStringToObject(channel, "name", channel_name);
+
+    sjson_AddArrayToObject(channel_messages, channel_name);
     
-    cJSON_AddArrayToObject(channel_messages, channel_name);
-    
-    char * res = cJSON_Print(channel);
+    char * res = sjson_Print(channel);
     fprintf(db, "%s", res);
     free(res);
     
-    cJSON_Delete(channel);
+    sjson_Delete(channel);
     fclose(db);
     
-    channel = cJSON_CreateObject();
-    arr = cJSON_CreateArray();
-    cJSON_AddItemToArray(arr, cJSON_CreateString(user->valuestring));
-    cJSON_AddStringToObject(channel, "type", "List");
-    cJSON_AddItemToObject(channel, "content", arr);
-    cJSON_AddItemToObject(channels, channel_name, channel);
+    channel = sjson_CreateObject();
+    arr = sjson_CreateArray();
+    sjson_AddItemToArray(arr, sjson_CreateString(user->valuestring));
+    sjson_AddStringToObject(channel, "type", "List");
+    sjson_AddItemToObject(channel, "content", arr);
+    sjson_AddItemToObject(channels, channel_name, channel);
     
-    cJSON_AddStringToObject(user_channels, token, channel_name);
-    cJSON_AddStringToObject(last_read, user->valuestring, "0");
+    sjson_AddStringToObject(user_channels, token, channel_name);
+    sjson_AddStringToObject(last_read, user->valuestring, "0");
     
     declare_success(client_sock);
 }
@@ -565,14 +566,14 @@ void join_channel_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
         return;
     }
     
-    if(cJSON_GetObjectItemCaseSensitive(user_channels, token) != NULL)
+    if(sjson_GetObjectItemCaseSensitive(user_channels, token) != NULL)
     {
         throw_error("User is already in a channel.", client_sock);
         return;
@@ -596,27 +597,27 @@ void join_channel_task(string client_message)
     }
     fclose(db);
     channel_content[i] = '\0';
-    cJSON * channel_json =  cJSON_Parse(channel_content);
-    cJSON * messages = cJSON_GetObjectItemCaseSensitive(channel_json, "messages");
+    sjson * channel_json =  sjson_Parse(channel_content);
+    sjson * messages = sjson_GetObjectItemCaseSensitive(channel_json, "messages");
     
-    char * res = cJSON_Print(messages);
-    cJSON_AddItemToObject(channel_messages, channel_name, cJSON_Parse(res));
+    char * res = sjson_Print(messages);
+    sjson_AddItemToObject(channel_messages, channel_name, sjson_Parse(res));
     free(res);
-    cJSON_Delete(channel_json);
+    sjson_Delete(channel_json);
     
-    cJSON * channel = cJSON_GetObjectItemCaseSensitive(channels, channel_name);
+    sjson * channel = sjson_GetObjectItemCaseSensitive(channels, channel_name);
     if(channel == NULL)
     {
-        channel = cJSON_CreateObject();
-        cJSON * arr = cJSON_CreateArray();
-        cJSON_AddStringToObject(channel, "type", "List");
-        cJSON_AddItemToObject(channel, "content", arr);
-        cJSON_AddItemToObject(channels, channel_name, channel);
+        channel = sjson_CreateObject();
+        sjson * arr = sjson_CreateArray();
+        sjson_AddStringToObject(channel, "type", "List");
+        sjson_AddItemToObject(channel, "content", arr);
+        sjson_AddItemToObject(channels, channel_name, channel);
     }
     
-    cJSON_AddItemToArray(cJSON_GetObjectItemCaseSensitive(channel, "content"), cJSON_CreateString(user->valuestring));
-    cJSON_AddStringToObject(user_channels, token, channel_name);
-    cJSON_AddStringToObject(last_read, user->valuestring, "0");
+    sjson_AddItemToArray(sjson_GetObjectItemCaseSensitive(channel, "content"), sjson_CreateString(user->valuestring));
+    sjson_AddStringToObject(user_channels, token, channel_name);
+    sjson_AddStringToObject(last_read, user->valuestring, "0");
     
     declare_success(client_sock);
 }
@@ -653,14 +654,14 @@ void send_message_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
         return;
     }
     
-    cJSON * channel = cJSON_GetObjectItemCaseSensitive(user_channels, token);
+    sjson * channel = sjson_GetObjectItemCaseSensitive(user_channels, token);
     if(channel == NULL)
     {
         throw_error("User is not in a channel.", client_sock);
@@ -685,18 +686,17 @@ void send_message_task(string client_message)
     }
     channel_content[i] = '\0';
     fclose(db);
+    sjson * channel_json =  sjson_Parse(channel_content);
     
-    cJSON * channel_json =  cJSON_Parse(channel_content);
+    sjson * original_messages = sjson_GetObjectItemCaseSensitive(channel_json, "messages");
     
-    cJSON * original_messages = cJSON_GetObjectItemCaseSensitive(channel_json, "messages");
+    sjson * message_json = sjson_CreateObject();
+    sjson_AddStringToObject(message_json, "sender", user->valuestring);
+    sjson_AddStringToObject(message_json, "content", message);
     
-    cJSON * message_json = cJSON_CreateObject();
-    cJSON_AddStringToObject(message_json, "sender", user->valuestring);
-    cJSON_AddStringToObject(message_json, "content", message);
+    sjson_AddItemToArray(original_messages, message_json);
     
-    cJSON_AddItemToArray(original_messages, message_json);
-    
-    char * res = cJSON_Print(channel_json);
+    char * res = sjson_Print(channel_json);
     db = fopen(fname, "w");
     if (db == NULL) {
         throw_error("Channel not found.", client_sock);
@@ -706,12 +706,12 @@ void send_message_task(string client_message)
     fclose(db);
     free(res);
     
-    message_json = cJSON_CreateObject();
-    cJSON_AddStringToObject(message_json, "sender", user->valuestring);
-    cJSON_AddStringToObject(message_json, "content", message);
-    cJSON_AddItemToArray(cJSON_GetObjectItemCaseSensitive(channel_messages, channel->valuestring), message_json);
+    message_json = sjson_CreateObject();
+    sjson_AddStringToObject(message_json, "sender", user->valuestring);
+    sjson_AddStringToObject(message_json, "content", message);
+    sjson_AddItemToArray(sjson_GetObjectItemCaseSensitive(channel_messages, channel->valuestring), message_json);
     
-    cJSON_Delete(channel_json);
+    sjson_Delete(channel_json);
     
     declare_success(client_sock);
 }
@@ -719,11 +719,6 @@ void send_message_task(string client_message)
 void show_new_messages_task(string client_message)
 {
     string token;
-    
-    int k = (int) strlen(client_message);
-    while (client_message[k] != ',' && k >= 0) {
-        k--;
-    }
     
     int i = 0, j = strlen("refresh ");
     while(client_message[j] != '\n')
@@ -733,43 +728,61 @@ void show_new_messages_task(string client_message)
         j++;
     }
     token[i] = '\0';
+//    printf("\n1\n");
     
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
         return;
     }
+//    printf("\n2\n");
     
-    cJSON * channel = cJSON_GetObjectItemCaseSensitive(user_channels, token);
+    sjson * channel = sjson_GetObjectItemCaseSensitive(user_channels, token);
     if(channel == NULL)
     {
         throw_error("User is not in a channel.", client_sock);
         return;
     }
+//    printf("\n3\n");
     
-    cJSON * messages = cJSON_GetObjectItemCaseSensitive(channel_messages, channel->valuestring);
-    char * unread_duplicate = cJSON_Print(messages);
-    cJSON * unread_messages = cJSON_CreateObject();
-    cJSON_AddStringToObject(unread_messages, "type", "List");
-    cJSON_AddItemToObject(unread_messages, "content", cJSON_Parse(unread_duplicate));
+    sjson * messages = sjson_GetObjectItemCaseSensitive(channel_messages, channel->valuestring);
+//    printf("\n4\n");
+    char * unread_duplicate = sjson_Print(messages);
+//    printf("\n5\n");
+    sjson * unread_messages = sjson_CreateObject();
+//    printf("\n6\n");
+    sjson_AddStringToObject(unread_messages, "type", "List");
+//    printf("\n7\n");
+    sjson_AddItemToObject(unread_messages, "content", sjson_Parse(unread_duplicate));
+//    printf("\n8\n");
     free(unread_duplicate);
-    cJSON * arr = cJSON_GetObjectItemCaseSensitive(unread_messages, "content");
-    int n = atoi(cJSON_GetObjectItemCaseSensitive(last_read, user->valuestring)->valuestring);
+//    printf("\n9\n");
+    sjson * arr = sjson_GetObjectItemCaseSensitive(unread_messages, "content");
+//    printf("\n10\n");
+    int n = atoi(sjson_GetObjectItemCaseSensitive(last_read, user->valuestring)->valuestring);
+//    printf("\n11\n");
     while (n > 0) {
-        cJSON_DeleteItemFromArray(arr, 0);
+//        printf("\n12 n: %d\n", n);
+        sjson_DeleteItemFromArray(arr, 0);
         n--;
     }
-    if(cJSON_GetObjectItemCaseSensitive(unread_messages, "content") == NULL)
-        cJSON_AddArrayToObject(unread_messages, "content");
+//    printf("\n13\n");
+    if(sjson_GetObjectItemCaseSensitive(unread_messages, "content") == NULL)
+        sjson_AddArrayToObject(unread_messages, "content");
     
-    cJSON_DeleteItemFromObject(last_read, user->valuestring);
+//    printf("\nfordebug: last_read before deletion: %s\n", sjson_Print(last_read));
+//    sjson * fordebug = sjson_GetObjectItemCaseSensitive(last_read, user->valuestring);
+//    printf("\nfordebug: %s %d %d %d\n", sjson_Print(fordebug), fordebug->child == NULL, fordebug->prev == NULL, fordebug->next == NULL);
+    sjson_DeleteItemFromObject(last_read, user->valuestring);
+//    printf("\nfordebug: Got Back!\n");
+//    printf("\nfordebug: last_read after deletion: %s\n", sjson_Print(last_read));
     string last_read_num;
-    sprintf(last_read_num, "%d", cJSON_GetArraySize(messages));
-    cJSON_AddStringToObject(last_read, user->valuestring, last_read_num);
-    char * res = cJSON_Print(unread_messages);
+    sprintf(last_read_num, "%d", sjson_GetArraySize(messages));
+    sjson_AddStringToObject(last_read, user->valuestring, last_read_num);
+    char * res = sjson_Print(unread_messages);
     
-    cJSON_Delete(unread_messages);
+    sjson_Delete(unread_messages);
     
     send(client_sock, res, strlen(res), 0);
     printf("Sent message: %s\n", res);
@@ -789,30 +802,30 @@ void show_members_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
         return;
     }
     
-    cJSON * channel = cJSON_GetObjectItemCaseSensitive(user_channels, token);
+    sjson * channel = sjson_GetObjectItemCaseSensitive(user_channels, token);
     if(channel == NULL)
     {
         throw_error("User is not in a channel.", client_sock);
         return;
     }
-    cJSON * channel_members = cJSON_GetObjectItemCaseSensitive(channels, channel->valuestring);
+    sjson * channel_members = sjson_GetObjectItemCaseSensitive(channels, channel->valuestring);
     if(channel_members == NULL)
     {
-        channel_members = cJSON_CreateObject();
-        cJSON * arr = cJSON_CreateArray();
-        cJSON_AddItemToArray(arr, cJSON_CreateString(user->valuestring));
-        cJSON_AddStringToObject(channel_members, "type", "List");
-        cJSON_AddItemToObject(channel_members, "content", arr);
-        cJSON_AddItemToObject(channels, channel->valuestring, channel_members);
+        channel_members = sjson_CreateObject();
+        sjson * arr = sjson_CreateArray();
+        sjson_AddItemToArray(arr, sjson_CreateString(user->valuestring));
+        sjson_AddStringToObject(channel_members, "type", "List");
+        sjson_AddItemToObject(channel_members, "content", arr);
+        sjson_AddItemToObject(channels, channel->valuestring, channel_members);
     }
-    char * res = cJSON_Print(channel_members);
+    char * res = sjson_Print(channel_members);
     send(client_sock, res, strlen(res), 0);
     printf("Sent message: %s\n", res);
     free(res);
@@ -830,24 +843,24 @@ void leave_channel_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
         return;
     }
 
-    cJSON * channel = cJSON_GetObjectItemCaseSensitive(user_channels, token);
+    sjson * channel = sjson_GetObjectItemCaseSensitive(user_channels, token);
     if(channel == NULL)
     {
         throw_error("User is not in a channel.", client_sock);
         return;
     }
-    cJSON * arr = cJSON_GetObjectItemCaseSensitive(channels, channel->valuestring);
-    arr = cJSON_GetObjectItemCaseSensitive(arr, "content");
-    int n = cJSON_GetArraySize(arr);
+    sjson * arr = sjson_GetObjectItemCaseSensitive(channels, channel->valuestring);
+    arr = sjson_GetObjectItemCaseSensitive(arr, "content");
+    int n = sjson_GetArraySize(arr);
     i = 0;
-    while (i < n && strcmp(cJSON_GetArrayItem(arr, i)->valuestring, cJSON_GetObjectItemCaseSensitive(users, token)->valuestring) != 0) {
+    while (i < n && strcmp(sjson_GetArrayItem(arr, i)->valuestring, sjson_GetObjectItemCaseSensitive(users, token)->valuestring) != 0) {
         i++;
     }
     if(i == n)
@@ -856,9 +869,11 @@ void leave_channel_task(string client_message)
         return;
     }
     
-    cJSON_DeleteItemFromObject(channel_messages, channel->valuestring);
-    cJSON_DeleteItemFromArray(arr, i);
-    cJSON_DeleteItemFromObject(user_channels, token);
+    sjson_DeleteItemFromObject(channel_messages, channel->valuestring);
+    sjson_DeleteItemFromArray(arr, i);
+    sjson_DeleteItemFromObject(user_channels, token);
+    sjson_DeleteItemFromObject(last_read, user->valuestring);
+    sjson_AddStringToObject(last_read, user->valuestring, "0");
     
     declare_success(client_sock);
 }
@@ -875,7 +890,7 @@ void user_logout_task(string client_message)
         j++;
     }
     token[i] = '\0';
-    cJSON * user = cJSON_GetObjectItemCaseSensitive(users, token);
+    sjson * user = sjson_GetObjectItemCaseSensitive(users, token);
     if(user == NULL || token[0] == '\0')
     {
         throw_error("Invalid token.", client_sock);
@@ -889,8 +904,8 @@ void user_logout_task(string client_message)
     }
     lower_username[i] = '\0';
     
-    cJSON_DeleteItemFromObject(online, lower_username);
-    cJSON_DeleteItemFromObject(users, token);
+    sjson_DeleteItemFromObject(online, lower_username);
+    sjson_DeleteItemFromObject(users, token);
     
     declare_success(client_sock);
 }

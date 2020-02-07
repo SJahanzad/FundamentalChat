@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "cJSON.c"
+#include "SJSON.h"
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include "client.h"
@@ -191,42 +191,41 @@ void user_login() // State: 2
     recv(sock, message, sizeof(string), 0);
     
     socket_shutdown();
+    sjson * result = sjson_Parse(message), * data;
     
-    cJSON * result = cJSON_Parse(message), * data;
+    data = sjson_GetObjectItemCaseSensitive(result, "type");
     
-    data = cJSON_GetObjectItemCaseSensitive(result, "type");
-    
-    if(cJSON_IsString(data))
+    if(sjson_IsString(data))
     {
         if(strcmp(data->valuestring, "AuthToken") == 0)  // Successful login
         {
-            data = cJSON_GetObjectItemCaseSensitive(result, "content");
-            if(cJSON_IsString(data))
+            data = sjson_GetObjectItemCaseSensitive(result, "content");
+            if(sjson_IsString(data))
             {
                 memset(token, 0, sizeof(string));
                 for(int i = 0; i < maxlen && data->valuestring[i] != '\0'; i++)
                     token[i] = data->valuestring[i];
                 printf("Welcome, %s! :)\n", username);
-                cJSON_Delete(result);
+                sjson_Delete(result);
                 state = main_menu_state;
                 return;
             }
         }
         
-        data = cJSON_GetObjectItemCaseSensitive(result, "content");
-        if(cJSON_IsString(data))
+        data = sjson_GetObjectItemCaseSensitive(result, "content");
+        if(sjson_IsString(data))
         {
             if(strcmp(data->valuestring, "Wrong password.") == 0) // ERROR: incorrect data
             {
                 printf("Wrong password!\n");
-                cJSON_Delete(result);
+                sjson_Delete(result);
                 state = account_menu_state;
                 return;
             }
             if(strcmp(data->valuestring, "Username is not valid.") == 0) // ERROR: no such user
             {
                 printf("Invalid username!\n");
-                cJSON_Delete(result);
+                sjson_Delete(result);
                 state = account_menu_state;
                 return;
             }
@@ -235,7 +234,7 @@ void user_login() // State: 2
     
     // If the function execution gets here, an unidentified error has occurred.
     printf("Oops! Login failed :(\n");
-    cJSON_Delete(result);
+    sjson_Delete(result);
     state = account_menu_state;
 }
 
@@ -436,27 +435,27 @@ void show_new_messages() // State: 9
     recv(sock, response, sizeof(string), 0);
     socket_shutdown();
     
-    cJSON * result = cJSON_Parse(response), * data, * item, * value;
+    sjson * result = sjson_Parse(response), * data, * item, * value;
 
-    data = cJSON_GetObjectItemCaseSensitive(result, "type");
+    data = sjson_GetObjectItemCaseSensitive(result, "type");
     
-    if(cJSON_IsString(data) && strcmp(data->valuestring, "List") == 0)
+    if(sjson_IsString(data) && strcmp(data->valuestring, "List") == 0)
     {
-        data = cJSON_GetObjectItemCaseSensitive(result, "content");
-        if(cJSON_IsArray(data))
+        data = sjson_GetObjectItemCaseSensitive(result, "content");
+        if(sjson_IsArray(data))
         {
-            int n = cJSON_GetArraySize(data);
+            int n = sjson_GetArraySize(data);
             if(n == 0)
                 printf("No new messages since last refresh.\n");
             else
                 printf("New messages since last refresh:\n");
             for(int i = 0; i < n; i++)
             {
-                item = cJSON_GetArrayItem(data, i);
+                item = sjson_GetArrayItem(data, i);
                 printf("\n");
-                value = cJSON_GetObjectItemCaseSensitive(item, "sender");
+                value = sjson_GetObjectItemCaseSensitive(item, "sender");
                 printf("%s:\n", value->valuestring);
-                value = cJSON_GetObjectItemCaseSensitive(item, "content");
+                value = sjson_GetObjectItemCaseSensitive(item, "content");
                 printf("%s\n", value->valuestring);
             }
         }
@@ -464,7 +463,7 @@ void show_new_messages() // State: 9
         printf("Oops! An error occurred :(\n");
     }
     
-    cJSON_Delete(result);
+    sjson_Delete(result);
     
     state = chat_menu_state;
 }
@@ -487,20 +486,20 @@ void show_channel_members() // State: 10
     recv(sock, response, sizeof(string), 0);
     socket_shutdown();
     
-    cJSON * result = cJSON_Parse(response), * data, * item;
+    sjson * result = sjson_Parse(response), * data, * item;
 
-    data = cJSON_GetObjectItemCaseSensitive(result, "type");
+    data = sjson_GetObjectItemCaseSensitive(result, "type");
     
-    if(cJSON_IsString(data) && strcmp(data->valuestring, "List") == 0)
+    if(sjson_IsString(data) && strcmp(data->valuestring, "List") == 0)
     {
-        data = cJSON_GetObjectItemCaseSensitive(result, "content");
-        if(cJSON_IsArray(data))
+        data = sjson_GetObjectItemCaseSensitive(result, "content");
+        if(sjson_IsArray(data))
         {
-            int n = cJSON_GetArraySize(data);
+            int n = sjson_GetArraySize(data);
             printf("Channel members:\n");
             for(int i = 0; i < n; i++)
             {
-                item = cJSON_GetArrayItem(data, i);
+                item = sjson_GetArrayItem(data, i);
                 printf("%s\n", item->valuestring);
             }
         }
@@ -508,7 +507,7 @@ void show_channel_members() // State: 10
         printf("Oops! An error occurred :(\n");
     }
     
-    cJSON_Delete(result);
+    sjson_Delete(result);
     
     state = chat_menu_state;
 }
@@ -584,19 +583,19 @@ int request_server(string message)
 
     socket_shutdown();
 
-    cJSON * result = cJSON_Parse(response), * data;
+    sjson * result = sjson_Parse(response), * data;
 
-    data = cJSON_GetObjectItemCaseSensitive(result, "type");
+    data = sjson_GetObjectItemCaseSensitive(result, "type");
 
     int success = 0;
-    if(cJSON_IsString(data))
+    if(sjson_IsString(data))
     {
         if(strcmp(data->valuestring, "Successful") == 0)
             success = 1;
         else
         {
-            data = cJSON_GetObjectItemCaseSensitive(result, "content");
-            if(cJSON_IsString(data))
+            data = sjson_GetObjectItemCaseSensitive(result, "content");
+            if(sjson_IsString(data))
                 printf("%s\n", data->valuestring);
             else
                 success = -1;
@@ -605,7 +604,7 @@ int request_server(string message)
         success = -1;
     }
 
-    cJSON_Delete(result);
+    sjson_Delete(result);
     return success;
 }
 

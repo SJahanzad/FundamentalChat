@@ -10,6 +10,7 @@
 		343279DD23A6CFE900DA6B51 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 343279DC23A6CFE900DA6B51 /* main.c */; };
 		346D6AA023D4D87600B51237 /* client.c in Sources */ = {isa = PBXBuildFile; fileRef = 346D6A9F23D4D87600B51237 /* client.c */; };
 		34767A7023DEE93C00692FB7 /* server.c in Sources */ = {isa = PBXBuildFile; fileRef = 34767A6F23DEE93C00692FB7 /* server.c */; };
+		34767A8923E87E8500692FB7 /* SJSON.c in Sources */ = {isa = PBXBuildFile; fileRef = 34767A8823E87E8500692FB7 /* SJSON.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -31,6 +32,8 @@
 		346D6A9F23D4D87600B51237 /* client.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = client.c; sourceTree = "<group>"; };
 		34767A6E23DEE93C00692FB7 /* server.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = server.h; sourceTree = "<group>"; };
 		34767A6F23DEE93C00692FB7 /* server.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = server.c; sourceTree = "<group>"; };
+		34767A8723E87E8500692FB7 /* SJSON.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SJSON.h; sourceTree = "<group>"; };
+		34767A8823E87E8500692FB7 /* SJSON.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SJSON.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -65,6 +68,8 @@
 			children = (
 				343279DC23A6CFE900DA6B51 /* main.c */,
 				34767A6E23DEE93C00692FB7 /* server.h */,
+				34767A8723E87E8500692FB7 /* SJSON.h */,
+				34767A8823E87E8500692FB7 /* SJSON.c */,
 				34767A6F23DEE93C00692FB7 /* server.c */,
 				346D6A9C23D4D43800B51237 /* client.h */,
 				346D6A9F23D4D87600B51237 /* client.c */,
@@ -130,6 +135,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				346D6AA023D4D87600B51237 /* client.c in Sources */,
+				34767A8923E87E8500692FB7 /* SJSON.c in Sources */,
 				34767A7023DEE93C00692FB7 /* server.c in Sources */,
 				343279DD23A6CFE900DA6B51 /* main.c in Sources */,
 			);
